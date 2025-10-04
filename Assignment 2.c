@@ -643,5 +643,310 @@ int circular_pop() {
     return item;
 }
 
+
+
+// --- TASK 13: Circular Buffer Stack (Memory-Efficient) ---
+
+#define CIRCULAR_MAX_SIZE 5
+int circular_buffer[CIRCULAR_MAX_SIZE];
+int circular_top = -1;
+int circular_count = 0; // Tracks actual number of elements
+
+void circular_push(int item) {
+    if (circular_count < CIRCULAR_MAX_SIZE) {
+        circular_top = (circular_top + 1) % CIRCULAR_MAX_SIZE;
+        circular_buffer[circular_top] = item;
+        circular_count++;
+        printf("CIRCULAR STACK: Pushed %d. Count: %d\n", item, circular_count);
+    } else {
+        // Overwrite the oldest item (FIFO behavior for stack implementation)
+        circular_top = (circular_top + 1) % CIRCULAR_MAX_SIZE;
+        circular_buffer[circular_top] = item;
+        printf("CIRCULAR STACK (OVERWRITE): Pushed %d. Buffer is full and oldest item was overwritten. Count: %d\n", item, circular_count);
+    }
+}
+
+int circular_pop() {
+    if (circular_count == 0) {
+        printf("CIRCULAR STACK: UNDERFLOW. \n");
+        return -1;
+    }
+    int item = circular_buffer[circular_top];
+    circular_top = (circular_top - 1 + CIRCULAR_MAX_SIZE) % CIRCULAR_MAX_SIZE;
+    circular_count--;
+    return item;
+}
+
 void task_13_circular_stack_memory_efficient() {
-    printf("\n--- Task 13: Circular Buffer Stack (Memor
+    printf("\n--- Task 13: Circular Buffer Stack (Memory-Efficient) ---\n");
+    circular_push(10);
+    circular_push(20);
+    circular_push(30);
+    circular_push(40);
+    circular_push(50); // Full
+    circular_push(60); // Overwrites 10 (or 50 if using classic circular queue)
+
+    printf("Popped: %d\n", circular_pop()); // 60
+    printf("Popped: %d\n", circular_pop()); // 50 (based on stack LIFO)
+    printf("Popped: %d\n", circular_pop()); // 40
+}
+
+// --- TASK 14: Priority Stack - Task scheduler ---
+
+typedef struct {
+    int id;
+    int priority; // 1 (highest) to 5 (lowest)
+} Task;
+
+Task priority_stack[10];
+int priority_top = -1;
+
+// Inserts task and maintains highest priority at the top (lowest index)
+void priority_push(Task new_task) {
+    if (priority_top >= 9) {
+        printf("PRIORITY STACK: Stack full, task not added.\n");
+        return;
+    }
+    priority_top++;
+    priority_stack[priority_top] = new_task;
+    
+    // Sort the stack to ensure highest priority task is at the 'top' (lowest index 0)
+    // Using simple Insertion Sort to maintain sorted order on insertion
+    for (int i = priority_top; i > 0; i--) {
+        // Higher priority means lower 'priority' value
+        if (priority_stack[i].priority < priority_stack[i - 1].priority) {
+            Task temp = priority_stack[i];
+            priority_stack[i] = priority_stack[i - 1];
+            priority_stack[i - 1] = temp;
+        } else {
+            break;
+        }
+    }
+    printf("PRIORITY STACK: Added Task %d (P%d). Current Top Task ID: %d\n", new_task.id, new_task.priority, priority_stack[0].id);
+}
+
+Task priority_pop() {
+    Task empty_task = {-1, -1};
+    if (priority_top < 0) {
+        printf("PRIORITY STACK: Empty.\n");
+        return empty_task;
+    }
+    
+    // The highest priority task is always at index 0 after sorting on push
+    Task executed_task = priority_stack[0];
+    
+    // Shift all elements up to remove the top element
+    for(int i = 0; i < priority_top; i++) {
+        priority_stack[i] = priority_stack[i+1];
+    }
+    priority_top--;
+    return executed_task;
+}
+
+void task_14_priority_stack_demo() {
+    printf("\n--- Task 14: Priority Stack - Task scheduler ---\n");
+    priority_push((Task){101, 3});
+    priority_push((Task){102, 1}); // Highest priority
+    priority_push((Task){103, 5});
+    priority_push((Task){104, 2});
+
+    Task t1 = priority_pop();
+    printf("Scheduler executed Task %d (Priority %d).\n", t1.id, t1.priority);
+
+    Task t2 = priority_pop();
+    printf("Scheduler executed Task %d (Priority %d).\n", t2.id, t2.priority);
+}
+
+// --- TASK 15: Undo Stack - Text Editor Feature (Two Stacks) ---
+
+#define MAX_UNDO_ACTIONS 20
+char *undo_stack[MAX_UNDO_ACTIONS]; // Stores document state before action
+char *redo_stack[MAX_UNDO_ACTIONS]; // Stores document state undone
+int undo_top = -1;
+int redo_top = -1;
+
+void push_state(char *stack[], int *top, const char *state) {
+    if (*top >= MAX_UNDO_ACTIONS - 1) {
+        printf("Undo/Redo stack full (max %d). State not saved.\n", MAX_UNDO_ACTIONS);
+        return;
+    }
+    *top = *top + 1;
+    stack[*top] = strdup(state); // Save a copy of the state
+}
+
+char *pop_state(char *stack[], int *top) {
+    if (*top < 0) {
+        return NULL;
+    }
+    char *state = stack[*top];
+    stack[*top] = NULL; // Clear pointer
+    *top = *top - 1;
+    return state;
+}
+
+// Document state (current text)
+char current_document_state[500] = "The quick brown fox.";
+
+void execute_action(const char *new_state, const char *action_desc) {
+    // 1. Save current state to undo stack
+    push_state(undo_stack, &undo_top, current_document_state);
+    
+    // 2. Clear redo stack (any new action invalidates previous redos)
+    while (redo_top >= 0) {
+        free(pop_state(redo_stack, &redo_top));
+    }
+
+    // 3. Update current document state
+    strcpy(current_document_state, new_state);
+    printf("Action: '%s'. Current state: '%s'\n", action_desc, current_document_state);
+}
+
+void undo() {
+    char *previous_state = pop_state(undo_stack, &undo_top);
+    if (previous_state) {
+        // Push current state to redo stack
+        push_state(redo_stack, &redo_top, current_document_state);
+        
+        // Restore document to previous state
+        strcpy(current_document_state, previous_state);
+        free(previous_state);
+        printf("UNDO: Performed. Document state restored to: '%s'\n", current_document_state);
+    } else {
+        printf("UNDO: No more actions to undo.\n");
+    }
+}
+
+void redo() {
+    char *next_state = pop_state(redo_stack, &redo_top);
+    if (next_state) {
+        // Push current state to undo stack
+        push_state(undo_stack, &undo_top, current_document_state);
+        
+        // Restore document to next state
+        strcpy(current_document_state, next_state);
+        free(next_state);
+        printf("REDO: Performed. Document state restored to: '%s'\n", current_document_state);
+    } else {
+        printf("REDO: No more actions to redo.\n");
+    }
+}
+
+void task_15_undo_stack_text_editor() {
+    printf("\n--- Task 15: Undo Stack - Text Editor Feature (Two Stacks) ---\n");
+    
+    // 1. Initial actions
+    execute_action("The quick brown fox jumps.", "Added 'jumps.'");
+    execute_action("The quick brown fox jumps over the lazy dog.", "Added 'over the lazy dog.'");
+    
+    // 2. Undo
+    undo();
+    undo();
+    undo(); // Should result in 'No more actions to undo.'
+
+    // 3. Redo
+    redo();
+    redo();
+    
+    // 4. New action invalidates redo stack
+    execute_action("The very quick brown fox.", "Changed 'The' to 'The very'");
+    redo(); // Should result in 'No more actions to redo.'
+    
+    // Clean up memory
+    while (undo_top >= 0) free(pop_state(undo_stack, &undo_top));
+    while (redo_top >= 0) free(pop_state(redo_stack, &redo_top));
+}
+
+// --- TASK 16: Double Stack - Two Stacks in One Array ---
+
+#define MAX_ARRAY_SIZE 10
+int double_stack_arr[MAX_ARRAY_SIZE];
+int top1 = -1;             // Stack 1 grows from left (0)
+int top2 = MAX_ARRAY_SIZE; // Stack 2 grows from right (MAX_ARRAY_SIZE-1)
+
+// Pushes item onto Stack 1
+void push1(int item) {
+    if (top1 < top2 - 1) {
+        double_stack_arr[++top1] = item;
+        printf("DS-S1: Pushed %d. Top1: %d\n", item, top1);
+    } else {
+        printf("DS-S1: STACK OVERFLOW. No space between stacks.\n");
+    }
+}
+
+// Pushes item onto Stack 2
+void push2(int item) {
+    if (top1 < top2 - 1) {
+        double_stack_arr[--top2] = item;
+        printf("DS-S2: Pushed %d. Top2: %d\n", item, top2);
+    } else {
+        printf("DS-S2: STACK OVERFLOW. No space between stacks.\n");
+    }
+}
+
+// Pops item from Stack 1
+int pop1() {
+    if (top1 >= 0) {
+        int item = double_stack_arr[top1--];
+        printf("DS-S1: Popped %d. Top1: %d\n", item, top1);
+        return item;
+    } else {
+        printf("DS-S1: STACK UNDERFLOW.\n");
+        return -1;
+    }
+}
+
+// Pops item from Stack 2
+int pop2() {
+    if (top2 < MAX_ARRAY_SIZE) {
+        int item = double_stack_arr[top2++];
+        printf("DS-S2: Popped %d. Top2: %d\n", item, top2);
+        return item;
+    } else {
+        printf("DS-S2: STACK UNDERFLOW.\n");
+        return -1;
+    }
+}
+
+void task_16_double_stack_in_one_array() {
+    printf("\n--- Task 16: Double Stack - Two Stacks in One Array ---\n");
+    printf("Max Array Size: %d\n", MAX_ARRAY_SIZE);
+
+    push1(10);
+    push2(100);
+    push1(20);
+    push2(200);
+    push1(30);
+    push2(300);
+    push1(40);
+    push2(400);
+    push1(50);
+    push2(500); // Stacks should meet here (top1=4, top2=5)
+    
+    // Attempt overflow
+    push1(60); 
+
+    pop1();
+    pop2();
+    pop1();
+}
+
+// --- MAIN EXECUTION ---
+
+int main() {
+    printf("BCA Problem Statement Lab Sheet 02 - Technical Training\n");
+    printf("********************************************************\n");
+    
+    // Only demonstrating Stack and Data Structure tasks (11-16) for this snippet
+    // task_11_fixed_stack_simulation(); // Uncomment if needed
+    // task_12_dynamic_stack_browser(); // Uncomment if needed
+    task_13_circular_stack_memory_efficient();
+    task_14_priority_stack_demo();
+    task_15_undo_stack_text_editor();
+    task_16_double_stack_in_one_array();
+
+    printf("\n********************************************************\n");
+    printf("Tasks 13 to 16 demonstrated successfully.\n");
+
+    return 0;
+}
+
